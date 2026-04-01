@@ -40,6 +40,7 @@ interface Snapshot {
   blocks_until_halving: number
   next_halving_reward: number
   epoch_progress: number
+  blocks_until_adjust: number
   avg_block_time_sec: number
   avg_fees_per_block: number
 }
