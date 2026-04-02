@@ -1,13 +1,13 @@
 'use client'
 
 export const dynamic = 'force-dynamic'
+
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import {
   LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
-  BarChart, Bar
 } from 'recharts'
 
 interface Snapshot {
@@ -126,21 +126,19 @@ function SectionTitle({ title }: { title: string }) {
 }
 
 export default function Home() {
-  const [data, setData]     = useState<Snapshot[]>([])
-  const [latest, setLatest] = useState<Snapshot | null>(null)
-  const [blocks, setBlocks] = useState<BlockRow[]>([])
+  const [data, setData]       = useState<Snapshot[]>([])
+  const [latest, setLatest]   = useState<Snapshot | null>(null)
+  const [blocks, setBlocks]   = useState<BlockRow[]>([])
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState('')
 
   const fetchData = async () => {
-    // Main time series — last 2 hours
     const { data: rows } = await supabase
       .from('mempool_snapshots')
       .select('*')
       .order('recorded_at', { ascending: false })
       .limit(120)
 
-    // Recent unique blocks for table
     const { data: blockRows } = await supabase
       .from('mempool_snapshots')
       .select('block_height, block_miner, block_tx_count, block_size_mb, block_time, total_fees_btc')
@@ -154,7 +152,6 @@ export default function Home() {
     }
 
     if (blockRows) {
-      // Deduplicate by block height
       const seen = new Set()
       const unique = blockRows.filter(b => {
         if (!b.block_height || seen.has(b.block_height)) return false
@@ -168,7 +165,15 @@ export default function Home() {
   }
 
   useEffect(() => {
-    fetchData()
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        window.location.href = '/login'
+        return
+      }
+      fetchData()
+    }
+    checkAuth()
     const interval = setInterval(fetchData, 60000)
     return () => clearInterval(interval)
   }, [])
@@ -184,26 +189,26 @@ export default function Home() {
   )
 
   const chartData = data.map(d => ({
-    time:        fmtTime(d.recorded_at),
-    fastest:     d.fee_fastest,
-    halfHour:    d.fee_half_hour,
-    hour:        d.fee_hour,
-    economy:     d.fee_economy,
-    txCount:     d.tx_count,
-    mempoolMb:   parseFloat((d.mempool_size_mb ?? 0).toFixed(2)),
-    hashrate:    parseFloat((d.current_hashrate ?? 0).toFixed(2)),
-    hashrate3d:  parseFloat((d.hashrate_3d ?? 0).toFixed(2)),
-    hashrate1w:  parseFloat((d.hashrate_1w ?? 0).toFixed(2)),
-    price:       d.btc_price_usd,
+    time:         fmtTime(d.recorded_at),
+    fastest:      d.fee_fastest,
+    halfHour:     d.fee_half_hour,
+    hour:         d.fee_hour,
+    economy:      d.fee_economy,
+    txCount:      d.tx_count,
+    mempoolMb:    parseFloat((d.mempool_size_mb ?? 0).toFixed(2)),
+    hashrate:     parseFloat((d.current_hashrate ?? 0).toFixed(2)),
+    hashrate3d:   parseFloat((d.hashrate_3d ?? 0).toFixed(2)),
+    hashrate1w:   parseFloat((d.hashrate_1w ?? 0).toFixed(2)),
+    price:        d.btc_price_usd,
     satsPerDollar: d.sats_per_dollar,
-    channels:    d.lightning_channels,
-    capacity:    parseFloat((d.lightning_capacity_btc ?? 0).toFixed(2)),
-    torNodes:    d.lightning_tor_nodes,
-    clearNodes:  d.lightning_clearnet_nodes,
-    nextFee:     d.next_block_fee,
-    secondFee:   d.second_block_fee,
-    thirdFee:    d.third_block_fee,
-    totalFees:   parseFloat((d.total_fees_btc ?? 0).toFixed(8)),
+    channels:     d.lightning_channels,
+    capacity:     parseFloat((d.lightning_capacity_btc ?? 0).toFixed(2)),
+    torNodes:     d.lightning_tor_nodes,
+    clearNodes:   d.lightning_clearnet_nodes,
+    nextFee:      d.next_block_fee,
+    secondFee:    d.second_block_fee,
+    thirdFee:     d.third_block_fee,
+    totalFees:    parseFloat((d.total_fees_btc ?? 0).toFixed(8)),
   }))
 
   const poolData = latest ? [
@@ -220,7 +225,7 @@ export default function Home() {
     { name: 'Remaining', value: parseFloat((latest.btc_remaining ?? 0).toFixed(0)) },
   ] : []
 
-  const minedPct   = latest ? ((latest.btc_total_mined / 21_000_000) * 100).toFixed(2) : '0'
+  const minedPct    = latest ? ((latest.btc_total_mined / 21_000_000) * 100).toFixed(2) : '0'
   const avgBlockMin = latest
     ? `${Math.floor(latest.avg_block_time_sec / 60)}m ${Math.round(latest.avg_block_time_sec % 60)}s`
     : '—'
@@ -237,12 +242,23 @@ export default function Home() {
             <p className="text-gray-500 text-xs">Sovereign data • Updated every 60s</p>
           </div>
         </div>
-        <div className="text-right">
-          <div className="flex items-center gap-2 justify-end">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <p className="text-green-400 text-xs">Live</p>
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <div className="flex items-center gap-2 justify-end">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <p className="text-green-400 text-xs">Live</p>
+            </div>
+            <p className="text-gray-500 text-xs">{lastUpdate}</p>
           </div>
-          <p className="text-gray-500 text-xs">{lastUpdate}</p>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut()
+              window.location.href = '/login'
+            }}
+            className="bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white text-xs px-3 py-2 rounded-lg transition-colors border border-gray-700"
+          >
+            Sign Out
+          </button>
         </div>
       </div>
 
@@ -303,7 +319,6 @@ export default function Home() {
         />
       </div>
 
-      {/* ── Fee Charts ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <ChartCard title="⚡ Fee Rates (sat/vB)">
           <ResponsiveContainer width="100%" height={200}>
@@ -329,9 +344,9 @@ export default function Home() {
               <YAxis tick={{ fill: '#6B7280', fontSize: 10 }} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Legend />
-              <Line type="monotone" dataKey="nextFee"   stroke={ORANGE} dot={false} name="Next Block"  strokeWidth={2} />
-              <Line type="monotone" dataKey="secondFee" stroke={BLUE}   dot={false} name="2nd Block"   strokeWidth={1.5} />
-              <Line type="monotone" dataKey="thirdFee"  stroke={GREEN}  dot={false} name="3rd Block"   strokeWidth={1.5} />
+              <Line type="monotone" dataKey="nextFee"   stroke={ORANGE} dot={false} name="Next Block" strokeWidth={2} />
+              <Line type="monotone" dataKey="secondFee" stroke={BLUE}   dot={false} name="2nd Block"  strokeWidth={1.5} />
+              <Line type="monotone" dataKey="thirdFee"  stroke={GREEN}  dot={false} name="3rd Block"  strokeWidth={1.5} />
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -401,9 +416,9 @@ export default function Home() {
               <YAxis tick={{ fill: '#6B7280', fontSize: 10 }} domain={['auto', 'auto']} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Legend />
-              <Line type="monotone" dataKey="hashrate"   stroke={PURPLE} dot={false} name="Current"  strokeWidth={2} />
-              <Line type="monotone" dataKey="hashrate3d" stroke={BLUE}   dot={false} name="3d Avg"   strokeWidth={1.5} />
-              <Line type="monotone" dataKey="hashrate1w" stroke={GREEN}  dot={false} name="1w Avg"   strokeWidth={1.5} />
+              <Line type="monotone" dataKey="hashrate"   stroke={PURPLE} dot={false} name="Current" strokeWidth={2} />
+              <Line type="monotone" dataKey="hashrate3d" stroke={BLUE}   dot={false} name="3d Avg"  strokeWidth={1.5} />
+              <Line type="monotone" dataKey="hashrate1w" stroke={GREEN}  dot={false} name="1w Avg"  strokeWidth={1.5} />
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -427,7 +442,6 @@ export default function Home() {
         </ChartCard>
       </div>
 
-      {/* Pool leaderboard */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4">
         <p className="text-gray-300 text-sm font-semibold mb-3">🏆 Pool Leaderboard (Last 7 Days)</p>
         <div className="grid grid-cols-3 gap-3">
@@ -445,7 +459,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Recent Blocks Table */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4">
         <p className="text-gray-300 text-sm font-semibold mb-3">🧱 Recent Blocks</p>
         <div className="overflow-x-auto">
