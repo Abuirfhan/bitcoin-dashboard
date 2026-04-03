@@ -165,14 +165,27 @@ export default function Home() {
   }
 
  useEffect(() => {
-    supabase.auth.onAuthStateChange((event, session) => {
+    // Check session on load
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        window.location.href = '/login'
+        return
+      }
+      fetchData()
+    })
+
+    // Also listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
         window.location.href = '/login'
       }
     })
-    fetchData()
+
     const interval = setInterval(fetchData, 60000)
-    return () => clearInterval(interval)
+    return () => {
+      subscription.unsubscribe()
+      clearInterval(interval)
+    }
   }, [])
 
   if (loading) return (
