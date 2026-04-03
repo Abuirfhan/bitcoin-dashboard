@@ -6,7 +6,6 @@ export const supabase = createClient(
   {
     auth: {
       persistSession: true,
-      storageKey: 'btc-monitor-auth',
       storage: typeof window !== 'undefined' ? window.localStorage : undefined,
     }
   }
