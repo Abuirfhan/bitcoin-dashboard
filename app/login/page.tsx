@@ -25,8 +25,10 @@ export default function LoginPage() {
       setError(error.message)
       setLoading(false)
     } else {
-      // Hard redirect to force full page reload with new session
-      window.location.href = '/'
+      // Wait for session to be stored before redirecting
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 1000)
     }
   }
 
