@@ -167,7 +167,9 @@ export default function Home() {
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('Session:', session)
       if (!session) {
+        console.log('No session found, redirecting...')
         window.location.href = '/login'
         return
       }
