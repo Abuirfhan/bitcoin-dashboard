@@ -164,18 +164,8 @@ export default function Home() {
     setLoading(false)
   }
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      console.log('Session:', session)
-      if (!session) {
-        console.log('No session found, redirecting...')
-        window.location.href = '/login'
-        return
-      }
-      fetchData()
-    }
-    checkAuth()
+ useEffect(() => {
+    fetchData()
     const interval = setInterval(fetchData, 60000)
     return () => clearInterval(interval)
   }, [])
